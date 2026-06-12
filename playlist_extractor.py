@@ -2,12 +2,14 @@ from youtube_transcript_api import YouTubeTranscriptApi
 import yt_dlp
 from utils import sanitize_filename
 
-def get_playlist_metadata(playlist_url):
+def get_playlist_metadata(playlist_url, cookies_file=None):
     """Fetches ONLY the playlist metadata (video IDs and titles). Extremely fast."""
     ydl_opts = {
-        'extract_flat': 'in_playlist',
+        'extract_flat': True, # Use True instead of 'in_playlist' to bypass 100 limit sometimes
         'quiet': True
     }
+    if cookies_file:
+        ydl_opts['cookiefile'] = cookies_file
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(playlist_url, download=False)
@@ -23,10 +25,13 @@ def get_playlist_metadata(playlist_url):
             
         return playlist_title, videos
 
-def fetch_transcript(video_id):
+def fetch_transcript(video_id, cookies_file=None):
     """Fetches the transcript for a single video. Returns (raw_text, error_message)."""
     try:
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        if cookies_file:
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, cookies=cookies_file)
+        else:
+            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
         
         transcript = None
         try:

@@ -17,17 +17,19 @@ st.set_page_config(page_title="YouTube Notes App", layout="wide", page_icon="�
 st.title("🎬 YouTube Playlist to Premium Notes")
 st.markdown("Automate the extraction and enrichment of video transcripts into beautiful PDFs and Markdown using the Gemini API.")
 
-# API Key Setup
-st.markdown("#### Step 1: Set your Gemini API Key")
-st.caption("Don't have one? [Click here to get your API key from Google AI Studio](https://aistudio.google.com/app/apikey)")
-api_key = st.text_input("Gemini API Key:", value=os.environ.get("GEMINI_API_KEY", ""), type="password")
-if api_key:
-    os.environ["GEMINI_API_KEY"] = api_key
+# Check Streamlit Secrets and os.environ
+gemini_key = os.environ.get("GEMINI_API_KEY")
+if not gemini_key and hasattr(st, "secrets") and "GEMINI_API_KEY" in st.secrets:
+    gemini_key = st.secrets["GEMINI_API_KEY"]
+    os.environ["GEMINI_API_KEY"] = gemini_key
 
-st.markdown("#### Step 2: Enter Playlist URL")
+st.markdown("#### Step 1: Enter Playlist URL")
 playlist_url = st.text_input("YouTube Playlist URL:", placeholder="https://www.youtube.com/playlist?list=...")
+st.markdown("#### Step 2: Upload Cookies (Mandatory for Streamlit Cloud!)")
+st.error("🚨 **CRITICAL FIX:** YouTube has blocked Streamlit Cloud's IP! You **MUST** upload your `cookies.txt` file here so YouTube thinks you are a real person, otherwise every video will fail and say '0 processed, 100 skipped'.")
+cookie_file = st.file_uploader("Upload your browser cookies.txt file", type=["txt"])
 
-st.caption("⏳ *Note: We automatically wait 5 seconds between videos to prevent YouTube from blocking your IP.*")
+st.caption("⏳ *Note: We automatically wait 5 seconds between successful videos to prevent YouTube from banning your cookies.*")
 
 st.markdown("---")
 
@@ -36,12 +38,21 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
         st.warning("Please enter a playlist URL.")
         st.stop()
     elif not os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY") == "your_gemini_api_key_here":
-        st.error("Please provide a valid Gemini API Key above.")
+        st.error("Please add your GEMINI_API_KEY to your Streamlit Secrets.")
         st.stop()
     else:
+        # Save cookies to temp file
+        cookies_path = None
+        if cookie_file:
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="wb")
+            tmp.write(cookie_file.read())
+            tmp.close()
+            cookies_path = tmp.name
+            st.success("✅ Cookies loaded securely.")
+
         with st.spinner("Fetching playlist metadata (this may take a moment)..."):
             try:
-                playlist_title, videos = get_playlist_metadata(playlist_url)
+                playlist_title, videos = get_playlist_metadata(playlist_url, cookies_file=cookies_path)
             except Exception as exc:
                 st.error(f"❌ Could not fetch playlist: {exc}")
                 st.stop()
@@ -59,13 +70,13 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
                 status_text.info(f"⏳ **[Video {i+1}/{len(videos)}]** Extracting transcript for: *{video_title}*...")
                 
                 # Fetch transcript
-                raw_text, error = fetch_transcript(video['video_id'])
+                raw_text, error = fetch_transcript(video['video_id'], cookies_file=cookies_path)
                 
                 if not raw_text:
                     video['error'] = error
                     failed_videos.append(video)
                     progress_bar.progress((i + 1) / len(videos))
-                    time.sleep(5.0)
+                    # Removed the time.sleep(5) here so it skips failures INSTANTLY!
                     continue
                     
                 time.sleep(5.0)
@@ -99,7 +110,9 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
 
                 progress_bar.progress((i + 1) / len(videos))
                 
-
+            # Cleanup temp cookie file
+            if cookies_path and os.path.exists(cookies_path):
+                os.unlink(cookies_path)
 
             status_text.success(f"Done! — ✅ {len(processed)} processed, ⚠️ {len(failed_videos)} skipped.")
             if len(processed) > 0:
