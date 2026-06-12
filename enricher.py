@@ -1,33 +1,36 @@
-from google import genai
 import os
+from google import genai
+from google.genai import types
 
-def enrich_notes(raw_text, safe_title, md_output_dir):
-    # Initialize API inside the function to ensure the env var is loaded first by app.py
+def enrich_notes(video_url, safe_title, md_output_dir):
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key or api_key == "your_gemini_api_key_here":
         raise ValueError("GEMINI_API_KEY is not set or is invalid.")
+        
     client = genai.Client(api_key=api_key)
     
-    prompt = f"""
-    You are an expert Data Science and Machine Learning tutor. Take the following raw, unformatted transcript from a video lecture and convert it into comprehensive, structured Markdown notes. 
+    prompt = """
+    You are an expert Data Science and Machine Learning tutor. Watch this video lecture and convert it into comprehensive, structured Markdown notes. 
     
     Requirements:
-    1. Clean up spoken errors and conversational filler.
-    2. Organize the content with clear headings (H1, H2, H3).
-    3. Summarize the core concepts.
-    4. Provide 'Extra Build-Up': Expand on the ML/AI concepts, mathematical intuition, and practical applications mentioned in the text. Add relevant Python code snippets (e.g., NumPy, Pandas, Scikit-learn, TensorFlow) where they illustrate the concept.
-    
-    Raw Transcript:
-    {raw_text}
+    1. Organize the content with clear headings (H1, H2, H3).
+    2. Summarize the core concepts covered in the video deeply, at around 100 to 200 words per minute of the video.
+    3. Provide 'Extra Build-Up': Expand on the ML/AI concepts, mathematical intuition, and practical applications. Add relevant Python code snippets where they illustrate the concept.
     """
     
     response = client.models.generate_content(
         model='gemini-2.5-flash',
-        contents=prompt
+        contents=[
+            types.Part.from_uri(
+                file_uri=video_url,
+                mime_type="video/mp4",
+            ),
+            prompt
+        ]
     )
+    
     enriched_markdown = response.text
     
-    # Save the markdown file using the sanitized original title
     file_path = os.path.join(md_output_dir, f"{safe_title}.md")
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(enriched_markdown)
