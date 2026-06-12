@@ -82,10 +82,10 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
 
                 progress_bar.progress((i + 1) / len(videos))
                 
-                # Rate limit delay for gemini-1.5-pro free tier
+                # Rate limit delay for gemini-1.5-flash free tier
                 if i < len(videos) - 1:
-                    status_text.info(f"⏳ **[Video {i+1}/{len(videos)}]** Waiting 35 seconds to prevent Google API rate limits...")
-                    time.sleep(35.0)
+                    status_text.info(f"⏳ **[Video {i+1}/{len(videos)}]** Waiting 5 seconds to prevent Google API rate limits...")
+                    time.sleep(5.0)
                 
 
             status_text.success(f"Done! — ✅ {len(processed)} processed, ⚠️ {len(failed_videos)} skipped.")

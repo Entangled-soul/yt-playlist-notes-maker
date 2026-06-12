@@ -26,7 +26,7 @@ def enrich_notes(video_url, safe_title, md_output_dir):
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
-                model='gemini-1.5-pro',
+                model='gemini-1.5-flash',
                 contents=[
                     types.Part.from_uri(
                         file_uri=video_url,
