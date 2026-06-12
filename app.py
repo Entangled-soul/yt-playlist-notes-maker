@@ -2,7 +2,8 @@ import streamlit as st
 import os
 import shutil
 import tempfile
-from playlist_extractor import get_playlist_data
+import time
+from playlist_extractor import get_playlist_metadata, fetch_transcript
 from enricher import enrich_notes
 from utils import setup_directories
 from pdf_generator import generate_pdf
@@ -40,7 +41,7 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
     else:
         with st.spinner("Fetching playlist metadata (this may take a moment)..."):
             try:
-                playlist_title, videos = get_playlist_data(playlist_url, delay=5.0, cookies_file=None)
+                playlist_title, videos = get_playlist_metadata(playlist_url)
             except Exception as exc:
                 st.error(f"❌ Could not fetch playlist: {exc}")
                 st.stop()
@@ -57,15 +58,22 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
                 video_title = video['original_title']
                 status_text.info(f"⏳ **[Video {i+1}/{len(videos)}]** Extracting transcript for: *{video_title}*...")
                 
-                if not video.get('raw_text'):
+                # Fetch transcript
+                raw_text, error = fetch_transcript(video['video_id'])
+                
+                if not raw_text:
+                    video['error'] = error
                     failed_videos.append(video)
                     progress_bar.progress((i + 1) / len(videos))
+                    time.sleep(5.0)
                     continue
+                    
+                time.sleep(5.0)
                     
                 try:
                     # 1. Enrich Text
                     status_text.info(f"🧠 **[Video {i+1}/{len(videos)}]** AI is generating notes for: *{video_title}* (this will take 15-30 seconds)...")
-                    enriched_md = enrich_notes(video['raw_text'], video['safe_title'], md_dir)
+                    enriched_md = enrich_notes(raw_text, video['safe_title'], md_dir)
                     
                     # 2. Convert to PDF
                     status_text.info(f"📄 **[Video {i+1}/{len(videos)}]** Converting notes to PDF...")

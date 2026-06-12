@@ -1,16 +1,13 @@
 from youtube_transcript_api import YouTubeTranscriptApi
 import yt_dlp
 from utils import sanitize_filename
-import time
-import random
 
-def get_playlist_data(playlist_url, delay=3.0, cookies_file=None):
+def get_playlist_metadata(playlist_url):
+    """Fetches ONLY the playlist metadata (video IDs and titles). Extremely fast."""
     ydl_opts = {
         'extract_flat': 'in_playlist',
         'quiet': True
     }
-    if cookies_file:
-        ydl_opts['cookiefile'] = cookies_file
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(playlist_url, download=False)
@@ -18,51 +15,43 @@ def get_playlist_data(playlist_url, delay=3.0, cookies_file=None):
         
         videos = []
         for entry in info['entries']:
-            video_id = entry['id']
-            original_title = entry['title']
-            safe_title = sanitize_filename(original_title)
+            videos.append({
+                'video_id': entry['id'],
+                'original_title': entry['title'],
+                'safe_title': sanitize_filename(entry['title'])
+            })
             
-            try:
-                # Fetch robust transcript
-                if cookies_file:
-                    transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, cookies=cookies_file)
-                else:
-                    transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-                
-                transcript = None
-                try:
-                    transcript = transcript_list.find_transcript(['en', 'en-IN', 'en-US', 'en-GB', 'hi'])
-                except:
-                    for t in transcript_list:
-                        transcript = t
-                        break
-                
-                if not transcript:
-                    raise Exception("No transcripts found")
-                    
-                if not transcript.language_code.startswith('en') and transcript.is_translatable:
-                    try:
-                        transcript = transcript.translate('en')
-                    except:
-                        pass
-                        
-                transcript_data = transcript.fetch()
-                raw_text = " ".join([t['text'] for t in transcript_data])
-                
-                videos.append({
-                    'video_id': video_id,
-                    'original_title': original_title,
-                    'safe_title': safe_title,
-                    'raw_text': raw_text
-                })
-            except Exception as e:
-                if "Too Many Requests" in str(e):
-                    print(f"Skipping '{original_title}': Rate limited by YouTube. You may need to wait before trying again.")
-                    time.sleep(10)
-                else:
-                    print(f"Skipping '{original_title}': No transcript available ({type(e).__name__}).")
-            
-            # Add a delay to prevent rate limiting
-            time.sleep(delay)
-                
         return playlist_title, videos
+
+def fetch_transcript(video_id):
+    """Fetches the transcript for a single video. Returns (raw_text, error_message)."""
+    try:
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        
+        transcript = None
+        try:
+            transcript = transcript_list.find_transcript(['en', 'en-IN', 'en-US', 'en-GB', 'hi'])
+        except:
+            for t in transcript_list:
+                transcript = t
+                break
+        
+        if not transcript:
+            return None, "No transcripts found for this video."
+            
+        # Ensure transcript is a valid object before accessing attributes
+        if hasattr(transcript, 'language_code') and not transcript.language_code.startswith('en') and getattr(transcript, 'is_translatable', False):
+            try:
+                transcript = transcript.translate('en')
+            except:
+                pass
+                
+        transcript_data = transcript.fetch()
+        raw_text = " ".join([t['text'] for t in transcript_data])
+        return raw_text, None
+        
+    except Exception as e:
+        if "Too Many Requests" in str(e):
+            return None, "Rate limited by YouTube."
+        else:
+            return None, f"{type(e).__name__}"
