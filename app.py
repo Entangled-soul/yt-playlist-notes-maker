@@ -44,11 +44,20 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
         # Save cookies to temp file
         cookies_path = None
         if cookie_file:
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="wb")
-            tmp.write(cookie_file.read())
+            content = cookie_file.read().decode('utf-8', errors='ignore')
+            
+            if "youtube.com" not in content:
+                st.error("❌ Invalid cookies.txt! You must go to **youtube.com** in your browser before clicking Export.")
+                st.stop()
+                
+            # Fix Python's MozillaCookieJar bug with HttpOnly cookies
+            content = content.replace("#HttpOnly_", "")
+            
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w", encoding="utf-8")
+            tmp.write(content)
             tmp.close()
             cookies_path = tmp.name
-            st.success("✅ Cookies loaded securely.")
+            st.success("✅ Cookies parsed and loaded securely.")
 
         with st.spinner("Fetching playlist metadata (this may take a moment)..."):
             try:
