@@ -15,28 +15,23 @@ st.set_page_config(page_title="YouTube Notes App", layout="wide", page_icon="�
 st.title("🎬 YouTube Playlist to Premium Notes")
 st.markdown("Automate the extraction and enrichment of video transcripts into beautiful PDFs and Markdown using the Gemini API.")
 
-# Sidebar - Settings or status
-with st.sidebar:
-    st.header("Settings")
-    api_key = st.text_input("Gemini API Key", value=os.environ.get("GEMINI_API_KEY", ""), type="password")
-    if api_key:
-        os.environ["GEMINI_API_KEY"] = api_key
-        
-    st.markdown("---")
-    st.markdown("""
-    **Pipeline Steps:**
-    1. Extract transcripts
-    2. Enrich via Gemini 2.5 Flash
-    3. Save to Markdown & PDF
-    """)
+# API Key Setup
+st.markdown("### Step 1: Set your Gemini API Key")
+st.markdown("Don't have one? [Click here to get your API key from Google AI Studio](https://aistudio.google.com/app/apikey)")
+api_key = st.text_input("Gemini API Key:", value=os.environ.get("GEMINI_API_KEY", ""), type="password")
+if api_key:
+    os.environ["GEMINI_API_KEY"] = api_key
 
-playlist_url = st.text_input("Enter YouTube Playlist URL:", placeholder="https://www.youtube.com/playlist?list=...")
+st.markdown("### Step 2: Enter Playlist URL")
+playlist_url = st.text_input("YouTube Playlist URL:", placeholder="https://www.youtube.com/playlist?list=...")
 
-if st.button("🚀 Process Playlist", type="primary"):
+st.markdown("---")
+
+if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
     if not playlist_url:
         st.warning("Please enter a playlist URL.")
     elif not os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY") == "your_gemini_api_key_here":
-        st.error("Please provide a valid Gemini API Key in the sidebar or .env file.")
+        st.error("Please provide a valid Gemini API Key above.")
     else:
         with st.spinner("Extracting metadata and transcripts (this may take a moment)..."):
             try:
@@ -52,23 +47,25 @@ if st.button("🚀 Process Playlist", type="primary"):
                 status_text = st.empty()
                 
                 for i, video in enumerate(videos):
-                    status_text.text(f"Processing ({i+1}/{len(videos)}): {video['original_title']}")
+                    video_title = video['original_title']
+                    status_text.info(f"⏳ **[Video {i+1}/{len(videos)}]** Extracting transcript for: *{video_title}*...")
                     
                     if not video.get('raw_text'):
-                        st.warning(f"⚠️ Skipped '{video['original_title']}': No transcript found.")
+                        st.warning(f"⚠️ Skipped '{video_title}': No transcript found.")
                         continue
                         
                     # 1. Enrich Text
+                    status_text.info(f"🧠 **[Video {i+1}/{len(videos)}]** AI is generating notes for: *{video_title}* (this will take 15-30 seconds)...")
                     enriched_md = enrich_notes(video['raw_text'], video['safe_title'], md_dir)
                     
-                    # 2. Convert to PDF (using original title)
+                    # 2. Convert to PDF
+                    status_text.info(f"📄 **[Video {i+1}/{len(videos)}]** Converting notes to PDF...")
                     pdf_path = os.path.join(pdf_dir, f"{video['safe_title']}.pdf")
-                    # Make sure the current working directory contains style.css or provide absolute path
                     css_path = os.path.join(os.path.dirname(__file__), "style.css")
                     generate_pdf(enriched_md, pdf_path, css_path=css_path)
                     
                     # Display the successful parsing for the user
-                    with st.expander(f"✅ {video['original_title']} - Processed"):
+                    with st.expander(f"✅ {video_title} - Processed"):
                         st.markdown(enriched_md)
                         with open(pdf_path, "rb") as pdf_file:
                             st.download_button(
