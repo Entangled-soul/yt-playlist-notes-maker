@@ -1,0 +1,7 @@
+yt-dlp
+youtube-transcript-api
+google-genai
+pdfkit
+Markdown
+streamlit
+python-dotenv

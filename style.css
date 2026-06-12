@@ -1,0 +1,110 @@
+/* Modern Premium Typography and Styling for ML Notes */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Fira+Code:wght@400;500&display=swap');
+
+body {
+    font-family: 'Inter', sans-serif;
+    color: #1a1a2e;
+    background-color: #ffffff;
+    line-height: 1.6;
+    margin: 40px auto;
+    max-width: 800px;
+    padding: 0 20px;
+}
+
+h1, h2, h3, h4 {
+    color: #0f3460;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    font-weight: 700;
+}
+
+h1 {
+    font-size: 2.2em;
+    border-bottom: 2px solid #e94560;
+    padding-bottom: 10px;
+}
+
+h2 {
+    font-size: 1.8em;
+    border-bottom: 1px solid #eaeaea;
+    padding-bottom: 5px;
+}
+
+h3 {
+    font-size: 1.4em;
+}
+
+p {
+    margin-bottom: 1em;
+}
+
+ul, ol {
+    margin-bottom: 1em;
+    padding-left: 20px;
+}
+
+li {
+    margin-bottom: 0.5em;
+}
+
+/* Code block styling */
+pre {
+    background-color: #f4f4f8;
+    border-radius: 8px;
+    padding: 15px;
+    overflow-x: auto;
+    border: 1px solid #e1e1e8;
+}
+
+code {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9em;
+    background-color: #f4f4f8;
+    padding: 2px 5px;
+    border-radius: 4px;
+    color: #e94560;
+}
+
+pre code {
+    background-color: transparent;
+    padding: 0;
+    color: #333;
+}
+
+/* Blockquotes for math or extra build-up notes */
+blockquote {
+    border-left: 5px solid #e94560;
+    background-color: #fdfafb;
+    margin: 1.5em 0;
+    padding: 15px 20px;
+    font-style: italic;
+    color: #555;
+    border-radius: 0 8px 8px 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1.5em;
+}
+
+table, th, td {
+    border: 1px solid #eaeaea;
+}
+
+th, td {
+    padding: 12px;
+    text-align: left;
+}
+
+th {
+    background-color: #f4f4f8;
+    font-weight: 600;
+}
+
+/* Math block styling (if any) */
+.math {
+    overflow-x: auto;
+    padding: 10px 0;
+}
