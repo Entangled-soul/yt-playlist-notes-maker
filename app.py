@@ -17,20 +17,16 @@ st.title("🎬 YouTube Playlist to Premium Notes")
 st.markdown("Automate the extraction and enrichment of video transcripts into beautiful PDFs and Markdown using the Gemini API.")
 
 # API Key Setup
-st.markdown("### Step 1: Set your Gemini API Key")
-st.markdown("Don't have one? [Click here to get your API key from Google AI Studio](https://aistudio.google.com/app/apikey)")
+st.markdown("#### Step 1: Set your Gemini API Key")
+st.caption("Don't have one? [Click here to get your API key from Google AI Studio](https://aistudio.google.com/app/apikey)")
 api_key = st.text_input("Gemini API Key:", value=os.environ.get("GEMINI_API_KEY", ""), type="password")
 if api_key:
     os.environ["GEMINI_API_KEY"] = api_key
 
-st.markdown("### Step 2: Enter Playlist URL")
+st.markdown("#### Step 2: Enter Playlist URL")
 playlist_url = st.text_input("YouTube Playlist URL:", placeholder="https://www.youtube.com/playlist?list=...")
 
-st.markdown("### Step 3: Rate-limit Bypass (Optional)")
-st.markdown("YouTube blocks rapid scraping. If you are getting rate-limited, upload your browser's **cookies.txt** file to completely bypass the block. You can get this using the [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc) Chrome extension.")
-cookie_file = st.file_uploader("Upload cookies.txt", type=["txt"])
-
-delay = st.slider("Delay between videos (seconds):", min_value=1.0, max_value=15.0, value=3.0, step=0.5, help="Slows down extraction to prevent YouTube from blocking your IP.")
+st.caption("⏳ *Note: We automatically wait 5 seconds between videos to prevent YouTube from blocking your IP.*")
 
 st.markdown("---")
 
@@ -42,18 +38,9 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
         st.error("Please provide a valid Gemini API Key above.")
         st.stop()
     else:
-        # Save cookies to temp file
-        cookies_path = None
-        if cookie_file:
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="wb")
-            tmp.write(cookie_file.read())
-            tmp.close()
-            cookies_path = tmp.name
-            st.success("✅ Cookies loaded securely.")
-
         with st.spinner("Fetching playlist metadata (this may take a moment)..."):
             try:
-                playlist_title, videos = get_playlist_data(playlist_url, delay=delay, cookies_file=cookies_path)
+                playlist_title, videos = get_playlist_data(playlist_url, delay=5.0, cookies_file=None)
             except Exception as exc:
                 st.error(f"❌ Could not fetch playlist: {exc}")
                 st.stop()
@@ -104,9 +91,7 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
 
                 progress_bar.progress((i + 1) / len(videos))
                 
-            # Cleanup temp cookie file
-            if cookies_path and os.path.exists(cookies_path):
-                os.unlink(cookies_path)
+
 
             status_text.success(f"Done! — ✅ {len(processed)} processed, ⚠️ {len(failed_videos)} skipped.")
             if len(processed) > 0:
