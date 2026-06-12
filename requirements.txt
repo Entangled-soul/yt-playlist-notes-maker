@@ -1,7 +1,7 @@
 yt-dlp
 youtube-transcript-api
 google-genai
-pdfkit
+weasyprint
 Markdown
 streamlit
 python-dotenv

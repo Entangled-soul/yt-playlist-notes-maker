@@ -1,6 +1,6 @@
-import pdfkit
 import markdown
 import os
+from weasyprint import HTML
 
 def generate_pdf(markdown_content, output_pdf_path, css_path="style.css"):
     # Convert markdown to HTML using extensions for tables and code highlighting
@@ -10,7 +10,6 @@ def generate_pdf(markdown_content, output_pdf_path, css_path="style.css"):
     )
     
     # Wrap in a full HTML document with a reference to the stylesheet or embedded CSS
-    # For local CSS, we can read the file and embed it so pdfkit picks it up easily
     css_content = ""
     if os.path.exists(css_path):
         with open(css_path, "r", encoding="utf-8") as f:
@@ -31,18 +30,6 @@ def generate_pdf(markdown_content, output_pdf_path, css_path="style.css"):
     </html>
     """
     
-    # Generate PDF from the HTML string
-    # Ensure wkhtmltopdf is in your system PATH
-    options = {
-        'page-size': 'A4',
-        'margin-top': '1in',
-        'margin-right': '1in',
-        'margin-bottom': '1in',
-        'margin-left': '1in',
-        'encoding': "UTF-8",
-        'no-outline': None,
-        'enable-local-file-access': None
-    }
-    
-    pdfkit.from_string(full_html, output_pdf_path, options=options)
+    # Generate PDF from the HTML string using WeasyPrint
+    HTML(string=full_html).write_pdf(output_pdf_path)
     return output_pdf_path
