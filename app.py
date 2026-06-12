@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import time
 from playlist_extractor import get_playlist_metadata, fetch_transcript
+from audio_fallback import download_audio, enrich_from_audio
 from enricher import enrich_notes
 from utils import setup_directories
 from pdf_generator import generate_pdf
@@ -82,10 +83,52 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
                 raw_text, error = fetch_transcript(video['video_id'], cookies_file=cookies_path)
                 
                 if not raw_text:
-                    video['error'] = error
-                    failed_videos.append(video)
+                    status_text.warning(f"🎧 **[Video {i+1}/{len(videos)}]** Transcript missing! Falling back to Native Audio AI for: *{video_title}*...")
+                    
+                    audio_path = download_audio(video['video_id'], cookies_file=cookies_path)
+                    if not audio_path:
+                        video['error'] = error + " (And audio fallback also failed)."
+                        failed_videos.append(video)
+                        progress_bar.progress((i + 1) / len(videos))
+                        continue
+                        
+                    try:
+                        status_text.info(f"🧠 **[Video {i+1}/{len(videos)}]** Gemini AI is listening to the audio for: *{video_title}* (this will take a minute)...")
+                        enriched_md = enrich_from_audio(audio_path, video['safe_title'], md_dir)
+                        
+                        # Cleanup local audio file immediately
+                        try:
+                            os.remove(audio_path)
+                        except:
+                            pass
+                            
+                        # Convert to PDF
+                        status_text.info(f"📄 **[Video {i+1}/{len(videos)}]** Converting audio notes to PDF...")
+                        pdf_path = os.path.join(pdf_dir, f"{video['safe_title']}.pdf")
+                        css_path = os.path.join(os.path.dirname(__file__), "style.css")
+                        generate_pdf(enriched_md, pdf_path, css_path=css_path)
+                        
+                        processed.append(video)
+                        
+                        with st.expander(f"✅ {video_title} - Processed via Audio AI"):
+                            st.markdown(enriched_md)
+                            with open(pdf_path, "rb") as pdf_file:
+                                st.download_button(
+                                    label="📥 Download PDF",
+                                    data=pdf_file,
+                                    file_name=f"{video['safe_title']}.pdf",
+                                    mime="application/pdf",
+                                    key=f"dl_{video['video_id']}"
+                                )
+                    except Exception as exc:
+                        # Cleanup local audio file
+                        try:
+                            os.remove(audio_path)
+                        except:
+                            pass
+                        failed_videos.append({**video, "error": f"Audio fallback failed: {str(exc)}", "error_type": "audio_fallback_error"})
+                        
                     progress_bar.progress((i + 1) / len(videos))
-                    # Removed the time.sleep(5) here so it skips failures INSTANTLY!
                     continue
                     
                 time.sleep(5.0)
