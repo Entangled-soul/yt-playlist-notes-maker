@@ -4,11 +4,13 @@ from utils import sanitize_filename
 import time
 import random
 
-def get_playlist_data(playlist_url):
+def get_playlist_data(playlist_url, delay=3.0, cookies_file=None):
     ydl_opts = {
         'extract_flat': 'in_playlist',
         'quiet': True
     }
+    if cookies_file:
+        ydl_opts['cookiefile'] = cookies_file
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(playlist_url, download=False)
@@ -22,7 +24,10 @@ def get_playlist_data(playlist_url):
             
             try:
                 # Fetch robust transcript
-                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+                if cookies_file:
+                    transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, cookies=cookies_file)
+                else:
+                    transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
                 
                 transcript = None
                 try:
@@ -57,7 +62,7 @@ def get_playlist_data(playlist_url):
                 else:
                     print(f"Skipping '{original_title}': No transcript available ({type(e).__name__}).")
             
-            # Add a random delay to prevent rate limiting
-            time.sleep(random.uniform(2.0, 4.0))
+            # Add a delay to prevent rate limiting
+            time.sleep(delay)
                 
         return playlist_title, videos
