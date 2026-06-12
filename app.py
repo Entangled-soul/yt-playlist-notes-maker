@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import shutil
+import time
 from playlist_extractor import get_playlist_metadata
 from enricher import enrich_notes
 from utils import setup_directories
@@ -80,6 +81,11 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
                     failed_videos.append({**video, "error": f"Failed to process video natively: {str(exc)}", "error_type": "gemini_error"})
 
                 progress_bar.progress((i + 1) / len(videos))
+                
+                # Rate limit delay for gemini-1.5-pro free tier
+                if i < len(videos) - 1:
+                    status_text.info(f"⏳ **[Video {i+1}/{len(videos)}]** Waiting 35 seconds to prevent Google API rate limits...")
+                    time.sleep(35.0)
                 
 
             status_text.success(f"Done! — ✅ {len(processed)} processed, ⚠️ {len(failed_videos)} skipped.")
