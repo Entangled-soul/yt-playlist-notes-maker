@@ -3,6 +3,7 @@ import os
 import shutil
 import time
 from playlist_extractor import get_playlist_metadata
+from subtitle_parser import download_and_parse_subtitle
 from enricher import enrich_notes
 from utils import setup_directories
 from pdf_generator import generate_pdf
@@ -55,8 +56,21 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
                 video_url = video['video_url']
                 
                 try:
-                    status_text.info(f"🧠 **[Video {i+1}/{len(videos)}]** Gemini is natively watching: *{video_title}* (this may take 15-30 seconds)...")
-                    enriched_md = enrich_notes(video_url, video['safe_title'], md_dir)
+                    status_text.info(f"⏳ **[Video {i+1}/{len(videos)}]** Downloading subtitles for: *{video_title}*...")
+                    raw_text, vtt_file, err = download_and_parse_subtitle(video_url)
+                    
+                    if not raw_text:
+                        failed_videos.append({**video, "error": err or "Failed to extract subtitle text", "error_type": "subtitle_error"})
+                        progress_bar.progress((i + 1) / len(videos))
+                        continue
+                        
+                    status_text.info(f"🧠 **[Video {i+1}/{len(videos)}]** Gemini is writing notes for: *{video_title}* (this may take 15-30 seconds)...")
+                    enriched_md = enrich_notes(raw_text, video['safe_title'], md_dir)
+                    
+                    # Cleanup the VTT file to keep things clean!
+                    if vtt_file and os.path.exists(vtt_file):
+                        try: os.remove(vtt_file)
+                        except: pass
                     
                     # Convert to PDF
                     status_text.info(f"📄 **[Video {i+1}/{len(videos)}]** Converting notes to PDF...")
@@ -67,7 +81,7 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
                     processed.append(video)
                     
                     # Display the successful parsing for the user
-                    with st.expander(f"✅ {video_title} - Processed natively via Gemini"):
+                    with st.expander(f"✅ {video_title} - Processed successfully"):
                         st.markdown(enriched_md)
                         with open(pdf_path, "rb") as pdf_file:
                             st.download_button(
@@ -78,14 +92,14 @@ if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
                                 key=f"dl_{video['video_id']}"
                             )
                 except Exception as exc:
-                    failed_videos.append({**video, "error": f"Failed to process video natively: {str(exc)}", "error_type": "gemini_error"})
+                    failed_videos.append({**video, "error": f"Failed to process video: {str(exc)}", "error_type": "general_error"})
 
                 progress_bar.progress((i + 1) / len(videos))
                 
-                # Rate limit delay for gemini-2.0-flash free tier
+                # Rate limit delay for Google API
                 if i < len(videos) - 1:
-                    status_text.info(f"⏳ **[Video {i+1}/{len(videos)}]** Waiting 7 seconds to prevent Google API rate limits...")
-                    time.sleep(7.0)
+                    status_text.info(f"⏳ **[Video {i+1}/{len(videos)}]** Waiting 15 seconds to prevent Google API rate limits...")
+                    time.sleep(15.0)
                 
 
             status_text.success(f"Done! — ✅ {len(processed)} processed, ⚠️ {len(failed_videos)} skipped.")
