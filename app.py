@@ -1,69 +1,139 @@
 import streamlit as st
 import os
-import glob
 import shutil
-import base64
+import time
+from playlist_extractor import get_playlist_metadata
+from subtitle_parser import download_and_parse_subtitle
+from enricher import enrich_notes
+from pdf_generator import generate_pdf
+from dotenv import load_dotenv
 
-st.set_page_config(page_title="YouTube Notes Library", layout="wide", page_icon="📚")
+load_dotenv()
 
-st.title("📚 Premium Notes Library")
-st.markdown("Welcome to your beautifully formatted, read-only PDF library. All heavy processing is now safely managed by the background `batch_processor.py` script.")
+st.set_page_config(page_title="YouTube Notes App", layout="wide", page_icon="📝")
 
-pdf_dir = "Final_PDFs"
-os.makedirs(pdf_dir, exist_ok=True)
+st.title("🎬 YouTube Playlist to Premium Notes")
+st.markdown("Automate the extraction and enrichment of video lectures into beautiful PDFs and Markdown using the Gemini API.")
 
-# Scan for PDFs
-pdf_files = sorted(glob.glob(os.path.join(pdf_dir, "*.pdf")))
+gemini_key = os.environ.get("GEMINI_API_KEY")
+if not gemini_key and hasattr(st, "secrets") and "GEMINI_API_KEY" in st.secrets:
+    gemini_key = st.secrets["GEMINI_API_KEY"]
+    os.environ["GEMINI_API_KEY"] = gemini_key
 
-if not pdf_files:
-    st.info("No PDFs found yet. Open your terminal and run `python batch_processor.py <PLAYLIST_URL>` to start generating notes!")
-    st.stop()
+st.markdown("#### Step 1: Enter Playlist URL")
+playlist_url = st.text_input("YouTube Playlist URL:", placeholder="https://www.youtube.com/playlist?list=...")
 
-# Master Download Button
-st.markdown("### 📥 Download All")
-if st.button("Download All Notes (ZIP)", type="primary"):
-    with st.spinner("Zipping files..."):
-        zip_path = shutil.make_archive(
-            base_name="All_Notes",
-            format='zip',
-            root_dir=pdf_dir
-        )
-        with open(zip_path, "rb") as f:
-            st.download_button(
-                label="Click here to download ZIP",
-                data=f,
-                file_name="All_Notes.zip",
-                mime="application/zip",
-                type="primary",
-                use_container_width=True
-            )
+st.markdown("---")
 
-st.divider()
+if st.button("🚀 Process Playlist", type="primary", use_container_width=True):
+    if not playlist_url:
+        st.warning("Please enter a playlist URL.")
+        st.stop()
+    elif not os.environ.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY") == "your_gemini_api_key_here":
+        st.error("Please add your GEMINI_API_KEY to your Streamlit Secrets.")
+        st.stop()
+    else:
+        with st.spinner("Fetching playlist metadata (this may take a moment)..."):
+            try:
+                playlist_title, videos = get_playlist_metadata(playlist_url)
+            except Exception as exc:
+                st.error(f"❌ Could not fetch playlist: {exc}")
+                st.stop()
+                
+            # Use hidden folders so Streamlit's file watcher completely ignores them!
+            # This prevents the infinite reload bug that caused 429 Too Many Requests errors.
+            md_dir = ".Markdown_Notes"
+            pdf_dir = ".Final_PDFs"
+            
+            os.makedirs(md_dir, exist_ok=True)
+            os.makedirs(pdf_dir, exist_ok=True)
+            
+            st.success(f"📂 Found {len(videos)} videos in: **{playlist_title}**")
+            
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            processed, failed_videos = [], []
+            
+            for i, video in enumerate(videos):
+                video_title = video['original_title']
+                video_url = video['video_url']
+                
+                try:
+                    status_text.info(f"⏳ **[Video {i+1}/{len(videos)}]** Downloading auto-subtitles for: *{video_title}*...")
+                    raw_text, vtt_file, err = download_and_parse_subtitle(video_url)
+                    
+                    if not raw_text:
+                        failed_videos.append({**video, "error": err or "Failed to extract subtitle text", "error_type": "subtitle_error"})
+                        progress_bar.progress((i + 1) / len(videos))
+                        continue
+                        
+                    status_text.info(f"🧠 **[Video {i+1}/{len(videos)}]** Gemini is writing notes for: *{video_title}* (this may take 15-30 seconds)...")
+                    enriched_md = enrich_notes(raw_text, video['safe_title'], md_dir)
+                    
+                    # Cleanup the temporary VTT file to keep server clean
+                    if vtt_file and os.path.exists(vtt_file):
+                        try: os.remove(vtt_file)
+                        except: pass
+                    
+                    # Convert to PDF
+                    status_text.info(f"📄 **[Video {i+1}/{len(videos)}]** Converting notes to PDF...")
+                    pdf_path = os.path.join(pdf_dir, f"{video['safe_title']}.pdf")
+                    css_path = os.path.join(os.path.dirname(__file__), "style.css")
+                    generate_pdf(enriched_md, pdf_path, css_path=css_path)
+                    
+                    processed.append(video)
+                    
+                    # Display the successful parsing for the user
+                    with st.expander(f"✅ {video_title} - Processed successfully"):
+                        st.markdown(enriched_md)
+                        with open(pdf_path, "rb") as pdf_file:
+                            st.download_button(
+                                label="📥 Download PDF",
+                                data=pdf_file,
+                                file_name=f"{video['safe_title']}.pdf",
+                                mime="application/pdf",
+                                key=f"dl_{video['video_id']}"
+                            )
+                except Exception as exc:
+                    failed_videos.append({**video, "error": f"Failed to process video: {str(exc)}", "error_type": "general_error"})
 
-# Search UI
-st.markdown(f"### 🔍 Browse {len(pdf_files)} Generated Notes")
-search_query = st.text_input("Search by video title:", placeholder="e.g. Linear Regression...")
+                progress_bar.progress((i + 1) / len(videos))
+                
+                # Rate limit delay for gemini-3.1-flash-lite free tier
+                if i < len(videos) - 1:
+                    status_text.info(f"⏳ **[Video {i+1}/{len(videos)}]** Waiting 5 seconds to prevent Google API rate limits...")
+                    time.sleep(5.0)
+                
 
-filtered_pdfs = []
-for pdf in pdf_files:
-    title = os.path.basename(pdf).replace(".pdf", "")
-    if search_query.lower() in title.lower():
-        filtered_pdfs.append((title, pdf))
+            status_text.success(f"Done! — ✅ {len(processed)} processed, ⚠️ {len(failed_videos)} skipped.")
+            if len(processed) > 0:
+                st.balloons()
+            
+            # Error summary
+            if failed_videos:
+                with st.expander(f"⚠️ {len(failed_videos)} video(s) could not be processed"):
+                    for v in failed_videos:
+                        st.markdown(f"**Skipped — {v.get('original_title', 'Unknown')}**")
+                        st.caption(f"Reason: {v.get('error', 'Unknown Error')}")
+                        st.divider()
 
-if not filtered_pdfs:
-    st.warning("No notes match your search.")
-else:
-    # Display in a clean grid layout
-    cols = st.columns(3)
-    for i, (title, pdf_path) in enumerate(filtered_pdfs):
-        with cols[i % 3]:
-            st.markdown(f"**{title}**")
-            with open(pdf_path, "rb") as f:
-                st.download_button(
-                    label="📥 Download PDF",
-                    data=f,
-                    file_name=f"{title}.pdf",
-                    mime="application/pdf",
-                    key=f"dl_pdf_{i}"
+            if len(processed) > 0:
+                # Zip the PDFs directory
+                st.info("📦 Zipping your notes...")
+                zip_path = shutil.make_archive(
+                    base_name=pdf_dir,
+                    format='zip',
+                    root_dir=pdf_dir
                 )
-            st.caption("---")
+                
+                st.success("All done! You can now download your complete notes.")
+                with open(zip_path, "rb") as f:
+                    st.download_button(
+                        label="⬇️ Download All Notes (ZIP)",
+                        data=f,
+                        file_name=f"{playlist_title}_notes.zip",
+                        mime="application/zip",
+                        type="primary",
+                        use_container_width=True
+                    )
