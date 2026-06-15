@@ -13,8 +13,13 @@ import glob
 import time
 from google import genai
 from dotenv import load_dotenv
-from pdf_generator import generate_pdf
-from utils import sanitize_filename
+import weasyprint
+import markdown
+
+def sanitize_filename(name):
+    # Replace spaces with underscores and strip invalid Windows characters
+    name = str(name).replace(' ', '_')
+    return re.sub(r'[<>:"/\\|?*]', '', name).strip()
 
 load_dotenv()
 
@@ -71,8 +76,29 @@ def stitch_and_compile(chapters_dir="Raw_Chapters", output_pdf="Master_ML_Textbo
             master_markdown += "\n\n<div class='page-break'></div>\n\n"
             
     print(f"📄 Compiling Master PDF (this may take a minute for {len(md_files)} chapters)...")
-    css_path = os.path.join(os.path.dirname(__file__), "style.css")
-    generate_pdf(master_markdown, output_pdf, css_path=css_path)
+    
+    # Convert markdown to HTML
+    html_content = markdown.markdown(master_markdown, extensions=['extra', 'tables', 'fenced_code'])
+    
+    # Simple inline CSS for proper page breaks and styling
+    styled_html = f\"\"\"
+    <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
+                h1, h2, h3 {{ color: #2c3e50; }}
+                pre {{ background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }}
+                code {{ font-family: Consolas, monospace; background: #f4f4f4; padding: 2px 4px; border-radius: 3px; }}
+                .page-break {{ page-break-after: always; }}
+            </style>
+        </head>
+        <body>
+            {html_content}
+        </body>
+    </html>
+    \"\"\"
+    
+    weasyprint.HTML(string=styled_html).write_pdf(output_pdf)
     print(f"🎉 SUCCESS: '{output_pdf}' is ready for review!")
 
 def process_transcripts(input_dir="Raw_Transcripts", chapters_dir="Raw_Chapters"):
