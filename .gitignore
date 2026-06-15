@@ -4,3 +4,11 @@ Raw_Chapters/
 *.pdf
 __pycache__/
 .env
+
+# Pipeline Runtime Files
+manifest_urls.txt
+playlist_name.txt
+*.vtt
+
+# Old Legacy Folders
+Markdown_Notes/
