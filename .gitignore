@@ -1,16 +1,6 @@
-__pycache__/
-*.pyc
-.env
-.DS_Store
-
-# Output directories
-Default_Playlist/
+cookies.txt
+Raw_Transcripts/
+Raw_Chapters/
 *.pdf
-*.md
-*.zip
-
-# Scratch/test scripts
-test2.py
-test_transcript.py
-test_ytdlp_subs.py
-smgg.py
+__pycache__/
+.env
