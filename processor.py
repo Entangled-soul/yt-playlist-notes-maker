@@ -77,29 +77,33 @@ def stitch_and_compile(chapters_dir="Raw_Chapters", output_pdf="Master_ML_Textbo
             
     print(f"📄 Compiling Master PDF (this may take a minute for {len(md_files)} chapters)...")
     
-    # Convert markdown to HTML
-    html_content = markdown.markdown(master_markdown, extensions=['extra', 'tables', 'fenced_code'])
-    
-    # Simple inline CSS for proper page breaks and styling
-    styled_html = f\"\"\"
+    # Convert combined markdown to HTML
+    html_content = markdown.markdown(master_markdown, extensions=['fenced_code', 'tables', 'extra'])
+
+    # Clean multi-line string (No backslashes!)
+    styled_html = f"""
+    <!DOCTYPE html>
     <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; }}
-                h1, h2, h3 {{ color: #2c3e50; }}
-                pre {{ background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }}
-                code {{ font-family: Consolas, monospace; background: #f4f4f4; padding: 2px 4px; border-radius: 3px; }}
-                .page-break {{ page-break-after: always; }}
-            </style>
-        </head>
-        <body>
-            {html_content}
-        </body>
+    <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; line-height: 1.6; margin: 40px; }}
+            h1, h2, h3 {{ color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px; }}
+            code {{ background-color: #f4f4f4; padding: 2px 4px; border-radius: 4px; font-family: monospace; }}
+            pre {{ background-color: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }}
+            pre code {{ background-color: transparent; padding: 0; }}
+            blockquote {{ border-left: 4px solid #ccc; margin-left: 0; padding-left: 15px; color: #666; }}
+            .page-break {{ page-break-after: always; }}
+        </style>
+    </head>
+    <body>
+        {html_content}
+    </body>
     </html>
-    \"\"\"
-    
+    """
+
+    # Generate the PDF
     weasyprint.HTML(string=styled_html).write_pdf(output_pdf)
-    print(f"🎉 SUCCESS: '{output_pdf}' is ready for review!")
+    print(f"🎉 SUCCESS: '{output_pdf}' is ready!")
 
 def process_transcripts(input_dir="Raw_Transcripts", chapters_dir="Raw_Chapters"):
     """
